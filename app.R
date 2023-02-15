@@ -334,6 +334,8 @@ server <- function(input, output, session){
     
   })
   
+  # call function for clustering
+  isolate({source("./utilities.R",local=T)})
   
   observeEvent(input$do,{
     
@@ -547,6 +549,241 @@ server <- function(input, output, session){
       )
       
     }
+    
+    # clustering visualization
+    output$fig3 <- renderPlotly({
+      tryCatch(
+        {
+          df <- storage2$biclist$bic_df
+          bic.total <- storage2$biclist$bic.total
+          parent <- storage2$biclist$parent
+          
+          z.post1 <- storage2$biclist$z.post1
+          w.post1 <- storage2$biclist$w.post1
+          
+          
+          parentnum <- df$parentnum
+          
+          ## BIC of the most frequent parent number
+          ind <- input$num
+          
+          ## The index number which parent number is "ind (most frequent parent number)"
+          ind5 <- c()
+          for(i in 1:storage2$Niter){
+            if(parentnum[i]==ind){
+              ind5 <- c(ind5, i)
+            }
+          }
+          bic5 <- bic.total[ind5]
+          
+          # The index number having smallest BIC among number of parent is "ind"
+          ind2 <- as.numeric(rownames(df[((df["parentnum"]==ind) & df["bic.total"]==bic5[which.min(bic5)] ),]))
+          
+          # location of "in2" (which is best interation whith having smallest BIC)
+          par5 <- parent[[ind2]]
+          par5 <- data.frame(par5)
+          colnames(par5) <- c('x', 'y')
+          
+          g_item <- clustering(w.post1, par5)
+          
+          
+          # raanking based on distance from center
+          # (The closer the center is, the greater the alpha is.)
+          g_alpha <- c()
+          
+          for(l in 1:ind){
+            temp <- g_item[which(g_item$group==l),]
+            temp <- ranking(temp)
+            g_alpha <- rbind(g_alpha, temp)
+          }
+          
+          # ordering by order of item
+          g_alpha <- g_alpha[order(as.numeric(rownames(g_alpha))),]
+          g_fin <- cbind(w.post1[,1:2], g_alpha)
+          
+          # parent density using the 1000 estimated parent location
+          cc <- parent[[1]]
+          for(i in 2:storage2$Niter){
+            cc<-rbind(cc, parent[[i]])
+          }
+          cc <- data.frame(cc)
+          colnames(cc) <- c('x','y')
+          
+          if(ind > length(LETTERS)){
+            addlabel = LETTERS
+            for(U in 1:length(LETTERS)){
+              for(l in 1:length(letters)){
+                addlabel = c(addlabel, paste0(LETTERS[U],letters[l]))
+              }
+            }
+            alphabet = addlabel[1:ind]
+          } else{
+            alphabet = LETTERS[1:ind]
+          }
+          
+          # Set the color and cluster name
+          ggcolor = rainbow(ind, s=.6, v=.9)[sample(1:ind, ind)]
+          par5["cluster"] <- alphabet
+          par5["color"] <- ggcolor
+          
+          # Draw plot using ggplot
+          temp <- (ggplot(w.post1, aes(x, y)) +
+                     geom_point(data=z.post1, aes(x, y), col="grey", cex=1.0) +
+                     stat_density_2d(data=cc, aes(x, y), color="gray80") + #density
+                     geom_text(data=g_fin, aes(x, y), label=rownames(g_fin), color=ggcolor[g_fin$group], cex=4, fontface="bold") + # number of item
+                     geom_text(data=par5, aes(x, y), label=alphabet[1:ind], col="gray30", cex=5.5, fontface="bold") + #alphabet
+                     theme_bw() +
+                     theme(plot.margin = unit(c(1,1,1,1), "cm"),
+                           axis.text=element_text(size=16),
+                           axis.title=element_text(size=14,face="bold"),
+                           axis.title.x=element_blank(),
+                           axis.title.y=element_blank(),
+                           legend.title=element_blank(),
+                           legend.position = c(0.9,0.9),
+                           legend.text = element_text(size=16),
+                           plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))+
+                     ggtitle("Interaction Map"))
+          
+          ggplotly(temp) %>%
+            add_markers(x = z.post1$x, y = z.post1$y,
+                        type = 'scatter',
+                        mode = 'markers',
+                        text = paste("respondent", 1:nrow(z.post1), sep = ""),
+                        name = "Respondent",
+                        marker = list(color = "lightgrey")) %>%
+            add_text(x = g_fin$x, y = g_fin$y, type = 'scatter',
+                     name = "Item",
+                     text = 1:nrow(w.post1),
+                     textfont = list(family="Arial Black",size=16, weight="bold", color = ggcolor[g_fin$group])) %>%
+            add_text(x = par5$x, y = par5$y, type = 'scatter',
+                     name = "Cluster",
+                     text = alphabet[1:ind],
+                     textfont = list(size=19, color = "black"))
+        },
+        error = function(e){
+          return()
+        },
+        warning = function(w){
+          return()
+        }
+      )
+    })
+    
+    # num of cluster slider
+    output$num = renderUI({
+      tryCatch(
+        {
+          shinyWidgets::sliderTextInput(inputId = "num",
+                                        label = "Number of Cluster:",
+                                        choices = storage2$biclist$tablec[,1],
+                                        selected = storage2$biclist$tablec[which.max(storage2$biclist$tablec[,2]),1])    
+        },
+        error = function(e){
+          return()
+        },
+        warning = function(w){
+          return()
+        }
+      )
+    })
+    
+    # optimal num of cluster
+    output$table2 <- DT::renderDataTable({
+      datatable(storage2$biclist$tablec, options = list(dom = 't'))
+    })
+    
+    # clustering result table
+    output$table1 <- renderDT({
+      
+      tryCatch(
+        {
+          df  <- storage2$biclist$bic_df
+          bic.total <- storage2$biclist$bic.total
+          parent <- storage2$biclist$parent
+          
+          z.post1 <- storage2$biclist$z.post1
+          w.post1 <- storage2$biclist$w.post1
+          
+          parentnum <- df$parentnum
+          
+          ## BIC of the most frequent parent number
+          ind <- input$num
+          
+          ## The index number which parent number is "ind (most frequent parent number)"
+          ind5 <- c()
+          for(i in 1:storage2$Niter){
+            if(parentnum[i]==ind){
+              ind5 <- c(ind5, i)
+            }
+          }
+          bic5 <- bic.total[ind5]
+          
+          
+          # The index number having smallest BIC among number of parent is "ind"
+          ind2 <- as.numeric(rownames(df[((df["parentnum"]==ind) & df["bic.total"]==bic5[which.min(bic5)] ),]))
+          
+          # location of "in2" (which is best interation whith having smallest BIC)
+          par5 <- parent[[ind2]]
+          par5 <- data.frame(par5)
+          colnames(par5) <- c('x', 'y')
+          
+          g_item <- clustering(w.post1, par5)
+          
+          
+          # raanking based on distance from center
+          # (The closer the center is, the greater the alpha is.)
+          g_alpha <- c()
+          
+          for(l in 1:ind){
+            temp <- g_item[which(g_item$group==l),]
+            temp <- ranking(temp)
+            g_alpha <- rbind(g_alpha, temp)
+          }
+          
+          # ordering by order of item
+          g_alpha <- g_alpha[order(as.numeric(rownames(g_alpha))),]
+          g_fin <- cbind(w.post1[,1:2], g_alpha)
+          
+          # parent density using the 1000 estimated parent location
+          cc <- parent[[1]]
+          for(i in 2:storage2$Niter){
+            cc<-rbind(cc, parent[[i]])
+          }
+          cc <- data.frame(cc)
+          colnames(cc) <- c('x','y')
+          
+          if(ind > length(LETTERS)){
+            addlabel = LETTERS
+            for(U in 1:length(LETTERS)){
+              for(l in 1:length(letters)){
+                addlabel = c(addlabel, paste0(LETTERS[U],letters[l]))
+              }
+            }
+            alphabet = addlabel[1:ind]
+          } else{
+            alphabet = LETTERS[1:ind]
+          }
+          
+          g_alpha2 <- cbind(g_alpha, item = rownames(g_alpha))
+          clust <- data.frame(
+            g_alpha2 %>%
+              group_by(group) %>%
+              summarise(items = paste(item, collapse = ", ")))
+          
+          data.frame(Group = alphabet[clust$group], Item = clust[,2])
+          
+        },
+        error = function(e){
+          return()
+        },
+        warning = function(w){
+          return()
+        }
+        
+      )
+    })
+    
+    
   })
   
   observeEvent(input$sampclust,{
@@ -789,250 +1026,6 @@ server <- function(input, output, session){
     })
     
   })
-  
-  # clustering visualization
-  output$fig3 <- renderPlotly({
-    tryCatch(
-      {
-        df <- storage2$biclist$bic_df
-        bic.total <- storage2$biclist$bic.total
-        parent <- storage2$biclist$parent
-        
-        z.post1 <- storage2$biclist$z.post1
-        w.post1 <- storage2$biclist$w.post1
-        
-        
-        parentnum <- df$parentnum
-        
-        ## BIC of the most frequent parent number
-        ind <- input$num
-        
-        ## The index number which parent number is "ind (most frequent parent number)"
-        ind5 <- c()
-        for(i in 1:storage2$Niter){
-          if(parentnum[i]==ind){
-            ind5 <- c(ind5, i)
-          }
-        }
-        bic5 <- bic.total[ind5]
-        
-        # The index number having smallest BIC among number of parent is "ind"
-        ind2 <- as.numeric(rownames(df[((df["parentnum"]==ind) & df["bic.total"]==bic5[which.min(bic5)] ),]))
-        
-        # location of "in2" (which is best interation whith having smallest BIC)
-        par5 <- parent[[ind2]]
-        par5 <- data.frame(par5)
-        colnames(par5) <- c('x', 'y')
-        
-        g_item <- clustering(w.post1, par5)
-        
-        
-        # raanking based on distance from center
-        # (The closer the center is, the greater the alpha is.)
-        g_alpha <- c()
-        
-        for(l in 1:ind){
-          temp <- g_item[which(g_item$group==l),]
-          temp <- ranking(temp)
-          g_alpha <- rbind(g_alpha, temp)
-        }
-        
-        # ordering by order of item
-        g_alpha <- g_alpha[order(as.numeric(rownames(g_alpha))),]
-        g_fin <- cbind(w.post1[,1:2], g_alpha)
-        
-        # parent density using the 1000 estimated parent location
-        cc <- parent[[1]]
-        for(i in 2:storage2$Niter){
-          cc<-rbind(cc, parent[[i]])
-        }
-        cc <- data.frame(cc)
-        colnames(cc) <- c('x','y')
-        
-        if(ind > length(LETTERS)){
-          addlabel = LETTERS
-          for(U in 1:length(LETTERS)){
-            for(l in 1:length(letters)){
-              addlabel = c(addlabel, paste0(LETTERS[U],letters[l]))
-            }
-          }
-          alphabet = addlabel[1:ind]
-        } else{
-          alphabet = LETTERS[1:ind]
-        }
-        
-        # Set the color and cluster name
-        ggcolor = rainbow(ind, s=.6, v=.9)[sample(1:ind, ind)]
-        par5["cluster"] <- alphabet
-        par5["color"] <- ggcolor
-        
-        # Draw plot using ggplot
-        temp <- (ggplot(w.post1, aes(x, y)) +
-                   geom_point(data=z.post1, aes(x, y), col="grey", cex=1.0) +
-                   stat_density_2d(data=cc, aes(x, y), color="gray80") + #density
-                   geom_text(data=g_fin, aes(x, y), label=rownames(g_fin), color=ggcolor[g_fin$group], cex=4, fontface="bold") + # number of item
-                   geom_text(data=par5, aes(x, y), label=alphabet[1:ind], col="gray30", cex=5.5, fontface="bold") + #alphabet
-                   theme_bw() +
-                   theme(plot.margin = unit(c(1,1,1,1), "cm"),
-                         axis.text=element_text(size=16),
-                         axis.title=element_text(size=14,face="bold"),
-                         axis.title.x=element_blank(),
-                         axis.title.y=element_blank(),
-                         legend.title=element_blank(),
-                         legend.position = c(0.9,0.9),
-                         legend.text = element_text(size=16),
-                         plot.title = element_text(hjust = 0.5, size = 20, face = "bold"))+
-                   ggtitle("Interaction Map"))
-        
-        ggplotly(temp) %>%
-          add_markers(x = z.post1$x, y = z.post1$y,
-                      type = 'scatter',
-                      mode = 'markers',
-                      text = paste("respondent", 1:nrow(z.post1), sep = ""),
-                      name = "Respondent",
-                      marker = list(color = "lightgrey")) %>%
-          add_text(x = g_fin$x, y = g_fin$y, type = 'scatter',
-                   name = "Item",
-                   text = 1:nrow(w.post1),
-                   textfont = list(family="Arial Black",size=16, weight="bold", color = ggcolor[g_fin$group])) %>%
-          add_text(x = par5$x, y = par5$y, type = 'scatter',
-                   name = "Cluster",
-                   text = alphabet[1:ind],
-                   textfont = list(size=19, color = "black"))
-      },
-      error = function(e){
-        return()
-      },
-      warning = function(w){
-        return()
-      }
-    )
-    
-    
-    
-  })
-  
-  # call function for clustering
-  isolate({source("./utilities.R",local=T)})
-  
-  # clustering result table
-  output$table1 <- renderDT({
-    
-    tryCatch(
-      {
-        df  <- storage2$biclist$bic_df
-        bic.total <- storage2$biclist$bic.total
-        parent <- storage2$biclist$parent
-        
-        z.post1 <- storage2$biclist$z.post1
-        w.post1 <- storage2$biclist$w.post1
-        
-        parentnum <- df$parentnum
-        
-        ## BIC of the most frequent parent number
-        ind <- input$num
-        
-        ## The index number which parent number is "ind (most frequent parent number)"
-        ind5 <- c()
-        for(i in 1:storage2$Niter){
-          if(parentnum[i]==ind){
-            ind5 <- c(ind5, i)
-          }
-        }
-        bic5 <- bic.total[ind5]
-        
-        
-        # The index number having smallest BIC among number of parent is "ind"
-        ind2 <- as.numeric(rownames(df[((df["parentnum"]==ind) & df["bic.total"]==bic5[which.min(bic5)] ),]))
-        
-        # location of "in2" (which is best interation whith having smallest BIC)
-        par5 <- parent[[ind2]]
-        par5 <- data.frame(par5)
-        colnames(par5) <- c('x', 'y')
-        
-        g_item <- clustering(w.post1, par5)
-        
-        
-        # raanking based on distance from center
-        # (The closer the center is, the greater the alpha is.)
-        g_alpha <- c()
-        
-        for(l in 1:ind){
-          temp <- g_item[which(g_item$group==l),]
-          temp <- ranking(temp)
-          g_alpha <- rbind(g_alpha, temp)
-        }
-        
-        # ordering by order of item
-        g_alpha <- g_alpha[order(as.numeric(rownames(g_alpha))),]
-        g_fin <- cbind(w.post1[,1:2], g_alpha)
-        
-        # parent density using the 1000 estimated parent location
-        cc <- parent[[1]]
-        for(i in 2:storage2$Niter){
-          cc<-rbind(cc, parent[[i]])
-        }
-        cc <- data.frame(cc)
-        colnames(cc) <- c('x','y')
-        
-        if(ind > length(LETTERS)){
-          addlabel = LETTERS
-          for(U in 1:length(LETTERS)){
-            for(l in 1:length(letters)){
-              addlabel = c(addlabel, paste0(LETTERS[U],letters[l]))
-            }
-          }
-          alphabet = addlabel[1:ind]
-        } else{
-          alphabet = LETTERS[1:ind]
-        }
-        
-        g_alpha2 <- cbind(g_alpha, item = rownames(g_alpha))
-        clust <- data.frame(
-          g_alpha2 %>%
-            group_by(group) %>%
-            summarise(items = paste(item, collapse = ", ")))
-        
-        data.frame(Group = alphabet[clust$group], Item = clust[,2])
-        
-      },
-      error = function(e){
-        return()
-      },
-      warning = function(w){
-        return()
-      }
-      
-    )
-    
-    
-  })
-  
-  
-  # num of cluster slider
-  output$num = renderUI({
-    tryCatch(
-      {
-        shinyWidgets::sliderTextInput(inputId = "num",
-                                      label = "Number of Cluster:",
-                                      choices = storage2$biclist$tablec[,1],
-                                      selected = storage2$biclist$tablec[which.max(storage2$biclist$tablec[,2]),1])    
-      },
-      error = function(e){
-        return()
-      },
-      warning = function(w){
-        return()
-      }
-    )
-  })
-  
-  # optimal num of cluster
-  output$table2 <- DT::renderDataTable({
-    datatable(storage2$biclist$tablec, options = list(dom = 't'))
-  })
-  
-  
 }
 
 shinyApp(ui = ui, server = server)
