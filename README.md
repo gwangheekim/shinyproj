@@ -27,3 +27,16 @@
     - 결과
         - Interaction Plot
         - Clustering Result
+
+# Example Server Link
+R studio에서 빌드하지 않고 웹 주소를 통해 기능을 실험하실 수 있습니다. 다만 로컬PC에 비해 CPU와 RAM 성능이 떨어지므로, 이미 올려둔 예제 데이터만 사용하는 것을 권장드립니다. 
+
+성능 문제로 인해 모든 구성요소가 출력되는데 시간이 걸릴 수 있습니다. 처음 사용하실 때에는 약 30초 ~ 1분 정도 기다리신 다음 새로고침하여 사용하시는 것을 권장드립니다(Step 1 화면에 시각화 결과가 출력되는 것을 기준으로 합니다).
+
+마찬가지로 성능 문제로 인해 Step 2에서 옵션을 바꾼 후 모형 적합 결과를 출력하는 데 시간이 걸릴 수 있습니다. 
+
+링크는 아래와 같습니다.
+
+https://ghkim.shinyapps.io/shiny/
+
+http://gwangheekim.synology.me:3838/lsirm/
