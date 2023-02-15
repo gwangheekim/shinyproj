@@ -1,5 +1,5 @@
 # Introduction
-이 어플리케이션은 Latent Space Item Response Model (LSIRM)을 사용하여 이분형 문항반응자료(Item Response Data)의 분석을 돕는 도구입니다. 이를 통해 연구자들은 데이터를 보다 쉽게 분석할 수 있으며, 여러 연구자가 동일한 조건에서 분석할 수 있어 연구 일관성을 확보할 수 있습니다.
+이 어플리케이션은 Latent Space Item Response Model (LSIRM)을 사용하여 이분형 문항반응자료(Item Response Data)를 분석해주는 도구입니다. 이를 통해 연구자들은 데이터를 보다 쉽게 분석할 수 있으며, 여러 연구자가 동일한 조건에서 분석할 수 있어 연구 일관성을 확보할 수 있습니다.
 
 ## 사용 방법
 - **Step 1. Data Upload & Visualization**
