@@ -40,3 +40,5 @@ R studio에서 빌드하지 않고 웹 주소를 통해 기능을 실험하실 �
 https://ghkim.shinyapps.io/shiny/
 
 http://gwangheekim.synology.me:3838/lsirm/
+
+아래의 링크는 중지될 수 있습니다.
